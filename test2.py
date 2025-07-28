@@ -18,22 +18,28 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 # Initialize the chat model
-llm = ChatOllama(model="deepseek-r1", temperature=0)
+# llm = ChatOllama(model="deepseek-r1:14B", temperature=0)
+llm = None  # Placeholder for the LLM, to be set later
 
-def chatbot(state: State):
-    # Check if a system message is already present
-    if not any(isinstance(m, SystemMessage) for m in state["messages"]):
-        # If not, prepend the system message
-        state["messages"].insert(0, SystemMessage(content="You are a helpful assistant! Your name is Bob."))
-    return {"messages": llm.invoke(state["messages"])}
+def create_chatbot(system_content: str):
+    def chatbot(state: State):
+        if system_content:
+            # Check if a system message is already present
+            if not any(isinstance(m, SystemMessage) for m in state["messages"]):
+                # If not, prepend the system message
+                state["messages"].insert(0, SystemMessage(content=system_content))
+        return {"messages": llm.invoke(state["messages"])}
+    return chatbot
 
 
-def build_chatbot_graph():
+
+def build_chatbot_graph(system_message: str = None):
     """
     Builds the chatbot graph with a single node for the chatbot function.
     """
     graph_builder = StateGraph(State)
-    graph_builder.add_node("chatbot", chatbot)
+    chatbot_func = create_chatbot(system_message)
+    graph_builder.add_node("chatbot", chatbot_func)
     graph_builder.add_edge(START, "chatbot")
     graph_builder.add_edge("chatbot", END)
     return graph_builder.compile(checkpointer=InMemorySaver())
