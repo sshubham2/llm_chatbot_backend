@@ -1,5 +1,5 @@
 import streamlit as st
-import test2
+import lg_cp_bend
 import re
 import os
 from datetime import datetime
@@ -7,7 +7,6 @@ from langchain.chat_models import init_chat_model
 import uuid
 import register_model as rm
 import json
-import pickle
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -360,7 +359,7 @@ def get_graph(response_model, response_provider, response_temp, reformulate_mode
                                     model_provider=reformulate_provider,
                                     temperature=1)
     
-    return test2.build_chatbot_graph(st.session_state.selected_personality, response_llm, reformulate_llm)
+    return lg_cp_bend.build_chatbot_graph(st.session_state.selected_personality, response_llm, reformulate_llm)
 
 # Clear the cached graph when any model changes
 if (st.session_state.selected_model != st.session_state.previous_model or 

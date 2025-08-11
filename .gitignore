@@ -24,3 +24,4 @@ __pycache__
 *.dist-info
 *.idea
 *.key
+saved_conversations
