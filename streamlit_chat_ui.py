@@ -281,71 +281,114 @@ if "previous_model" not in st.session_state:
     st.session_state.previous_model = st.session_state.selected_model
 if "previous_provider" not in st.session_state:
     st.session_state.previous_provider = st.session_state.selected_provider
+if "reformulate_provider" not in st.session_state:
+    st.session_state.reformulate_provider = "Ollama"
+if "reformulate_model" not in st.session_state:
+    st.session_state.reformulate_model = "deepseek-r1"
+if "previous_reformulate_model" not in st.session_state:
+    st.session_state.previous_reformulate_model = st.session_state.reformulate_model
+if "previous_reformulate_provider" not in st.session_state:
+    st.session_state.previous_reformulate_provider = st.session_state.reformulate_provider
 
 with st.sidebar:
     st.markdown('<div class="sidebar-section">🎭 Personality</div>', unsafe_allow_html=True)
     # Get list of all personalities
     personalities = registry.get_all_personalities()
     if personalities:
-        st.session_state.selected_personality = st.selectbox("Choose AI Personality", 
-                                                              [p[0] for p in personalities],
-                                                              index=None, key="personality_select",
-                                                              help="Select a personality to customize the AI's behavior")
-    st.markdown('<div class="sidebar-section">🔧 Model Configuration</div>', unsafe_allow_html=True)
+        selected_personality = st.selectbox("Choose AI Personality", 
+                                           [p[0] for p in personalities],
+                                           index=None, key="personality_select",
+                                           help="Select a personality to customize the AI's behavior")
+        st.session_state.selected_personality = selected_personality
+    
+    st.markdown('<div class="sidebar-section">🔄 Context Processing Model</div>', unsafe_allow_html=True)
     providers = registry.get_all_providers()
     if not providers:
         st.error("No providers registered. Please register a model first.")
-    st.session_state.selected_provider = st.selectbox("🏢 Provider",[p[0] for p in providers],
-                                                        index=0, key="provider_select")
-    if st.session_state.selected_provider:
-        models = registry.get_models_by_provider(st.session_state.selected_provider)
-        st.session_state.selected_model = st.selectbox("🧠 Model", [m[0] for m in models],
-                                                        index=0, key="model_select")
-        if st.session_state.selected_model:
+    
+    reformulate_provider = st.selectbox("🏢 Context Provider", [p[0] for p in providers],
+                                       index=0, key="reformulate_provider_select")
+    st.session_state.reformulate_provider = reformulate_provider
+    
+    if reformulate_provider:
+        reformulate_models = registry.get_models_by_provider(reformulate_provider)
+        reformulate_model = st.selectbox("🧠 Context Model", [m[0] for m in reformulate_models],
+                                        index=0, key="reformulate_model_select",
+                                        help="Model used for reformulating questions with context")
+        st.session_state.reformulate_model = reformulate_model
+    
+    st.markdown('<div class="sidebar-section">🤖 Response Generation Model</div>', unsafe_allow_html=True)
+    selected_provider = st.selectbox("🏢 Response Provider", [p[0] for p in providers],
+                                    index=0, key="provider_select")
+    st.session_state.selected_provider = selected_provider
+    
+    if selected_provider:
+        models = registry.get_models_by_provider(selected_provider)
+        selected_model = st.selectbox("🧠 Response Model", [m[0] for m in models],
+                                     index=0, key="model_select",
+                                     help="Model used for generating the final response")
+        st.session_state.selected_model = selected_model
+        
+        if selected_model:
             try:
-                api_key = registry.get_api_key(st.session_state.selected_provider)
-                env_var_name = registry.get_api_env_name(st.session_state.selected_provider)
-                if api_key and env_var_name:
-                    api_key = os.environ[f'{env_var_name}'] = f"{api_key}"
+                # Set up API keys for both providers
+                for provider in [selected_provider, reformulate_provider]:
+                    api_key = registry.get_api_key(provider)
+                    env_var_name = registry.get_api_env_name(provider)
+                    if api_key and env_var_name:
+                        api_key = os.environ[f'{env_var_name}'] = f"{api_key}"
             except Exception as e:
                 st.error(f"Configuration error: {e}")
                 st.stop()
-            st.session_state.selected_temperature = st.slider("🌡️ Temperature", 0.0, 1.0, 0.5, key="temperature",
-                                                              help="Lower values make responses more focused, higher values more creative")
+            
+            selected_temperature = st.slider("🌡️ Response Temperature", 0.0, 1.0, 0.5, key="temperature",
+                                            help="Temperature for response generation (lower = more focused, higher = more creative)")
+            st.session_state.selected_temperature = selected_temperature
         else:
-            st.error("Unable to initilize the model. Please check the log.")
+            st.error("Unable to initialize the model. Please check the log.")
 
 # Cache the graph so it's not rebuilt on every run.
 # This preserves the conversation history in the graph's memory.
 @st.cache_resource
-def get_graph(model_name, provider, temperature):
-    # Update the model inside the cached function
-    test2.llm = init_chat_model(model_name,
-                               model_provider=provider,
-                               temperature=temperature)
-    return test2.build_chatbot_graph(st.session_state.selected_personality)
+def get_graph(response_model, response_provider, response_temp, reformulate_model, reformulate_provider):
+    # Update both models inside the cached function
+    response_llm = init_chat_model(response_model,
+                                 model_provider=response_provider,
+                                 temperature=response_temp)
+    
+    reformulate_llm = init_chat_model(reformulate_model,
+                                    model_provider=reformulate_provider,
+                                    temperature=1)
+    
+    return test2.build_chatbot_graph(st.session_state.selected_personality, response_llm, reformulate_llm)
 
-# Clear the cached graph when model changes
+# Clear the cached graph when any model changes
 if (st.session_state.selected_model != st.session_state.previous_model or 
-    st.session_state.selected_provider != st.session_state.previous_provider):
+    st.session_state.selected_provider != st.session_state.previous_provider or
+    st.session_state.reformulate_model != st.session_state.previous_reformulate_model or
+    st.session_state.reformulate_provider != st.session_state.previous_reformulate_provider):
     get_graph.clear()  # Clear the cached graph
     st.session_state.previous_model = st.session_state.selected_model
     st.session_state.previous_provider = st.session_state.selected_provider
+    st.session_state.previous_reformulate_model = st.session_state.reformulate_model
+    st.session_state.previous_reformulate_provider = st.session_state.reformulate_provider
     
-# Display the selected model and provider at the top of the page
-model_display_name = registry.get_model_display_name(st.session_state.selected_provider, st.session_state.selected_model)
+# Display the selected models and providers at the top of the page
+response_model_display = registry.get_model_display_name(st.session_state.selected_provider, st.session_state.selected_model)
+context_model_display = registry.get_model_display_name(st.session_state.reformulate_provider, st.session_state.reformulate_model)
+
 if st.session_state.selected_personality:
     st.markdown(f'''
     <div class="model-header">
         <h2>🎭 {st.session_state.selected_personality}</h2>
-        <p style="margin: 0; opacity: 0.8;">Powered by {model_display_name}</p>
+        <p style="margin: 0; opacity: 0.8;">Response: {response_model_display} | Context: {context_model_display}</p>
     </div>
     ''', unsafe_allow_html=True)
 else:
     st.markdown(f'''
     <div class="model-header">
-        <h2>🤖 Chat with {model_display_name}</h2>
-        <p style="margin: 0; opacity: 0.8;">Model: {st.session_state.selected_model} | Temperature: {st.session_state.selected_temperature}</p>
+        <h2>🤖 Dual Model Chat</h2>
+        <p style="margin: 0; opacity: 0.8;">Response: {response_model_display} | Context: {context_model_display}</p>
     </div>
     ''', unsafe_allow_html=True)
 
@@ -372,14 +415,16 @@ if prompt := st.chat_input("💬 Ask me anything..."):
     with st.chat_message("assistant"):
         graph = get_graph(st.session_state.selected_model, 
                 st.session_state.selected_provider,
-                st.session_state.selected_temperature)
+                st.session_state.selected_temperature,
+                st.session_state.reformulate_model,
+                st.session_state.reformulate_provider)
         
         # The checkpointer in the graph will load the previous messages for the given thread_id
         try:
             events = graph.stream(
                 {"messages": [("user", prompt)]},
                 config=config,
-                stream_mode="messages"
+                stream_mode="updates"
             )
         except Exception as e:
             st.error(f"Error invoking the model: {e}")
@@ -389,11 +434,18 @@ if prompt := st.chat_input("💬 Ask me anything..."):
         if events:
             placeholder = st.empty()
             full_response = ""
+            
             for chunk in events:
-                # The stream yields lists of message chunks. We get the content from the first one.
-                content = chunk[0].content if chunk else ""
-                full_response += content
-                placeholder.markdown(full_response + "▌")
+                # Only process updates from the chatbot node
+                if "chatbot" in chunk and "messages" in chunk["chatbot"]:
+                    messages = chunk["chatbot"]["messages"]
+                    if messages:
+                        # Get the last message content
+                        message = messages[-1]
+                        if hasattr(message, 'content'):
+                            content = message.content
+                            full_response = content  # Replace, don't concatenate
+                            placeholder.markdown(full_response + "▌")
 
             # Clear the placeholder and render the final, formatted response
             placeholder.empty()
