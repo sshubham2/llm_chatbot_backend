@@ -6,6 +6,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.messages import SystemMessage, HumanMessage
+import register_model as rm
 
 class State(TypedDict):
     # Messages have the type "list". The `add_messages` function
@@ -105,10 +106,18 @@ def create_chatbot(system_content: str):
         return {}
     return chatbot
 
-def build_chatbot_graph(system_message: str = None, response_model=None, reformulate_model=None):
+def build_chatbot_graph(personality_name: str = None, response_model=None, reformulate_model=None):
     """
     Builds the chatbot graph with two separate nodes: context processor and chatbot.
     """
+    
+    system_message = None
+    
+    # Get the actual system message content from the personality
+    if personality_name:
+        registry = rm.ModelRegistry()
+        system_message = registry.get_personality_description(personality_name)
+    
     global response_llm, reformulate_llm
     
     # Set the models

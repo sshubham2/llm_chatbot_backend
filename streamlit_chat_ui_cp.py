@@ -288,6 +288,8 @@ if "previous_reformulate_model" not in st.session_state:
     st.session_state.previous_reformulate_model = st.session_state.reformulate_model
 if "previous_reformulate_provider" not in st.session_state:
     st.session_state.previous_reformulate_provider = st.session_state.reformulate_provider
+if "previous_personality" not in st.session_state:
+    st.session_state.previous_personality = st.session_state.selected_personality
 
 with st.sidebar:
     st.markdown('<div class="sidebar-section">🎭 Personality</div>', unsafe_allow_html=True)
@@ -365,7 +367,8 @@ def get_graph(response_model, response_provider, response_temp, reformulate_mode
 if (st.session_state.selected_model != st.session_state.previous_model or 
     st.session_state.selected_provider != st.session_state.previous_provider or
     st.session_state.reformulate_model != st.session_state.previous_reformulate_model or
-    st.session_state.reformulate_provider != st.session_state.previous_reformulate_provider):
+    st.session_state.reformulate_provider != st.session_state.previous_reformulate_provider or
+     st.session_state.selected_personality != st.session_state.previous_personality):
     get_graph.clear()  # Clear the cached graph
     st.session_state.previous_model = st.session_state.selected_model
     st.session_state.previous_provider = st.session_state.selected_provider

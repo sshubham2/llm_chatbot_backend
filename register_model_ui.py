@@ -127,23 +127,35 @@ with tab4:
                 
     #Edit existing system prompts
     st.markdown("#### Edit Existing System Prompts")
-    edit_prompt_form = st.form("Edit System Prompt Form", clear_on_submit=True)
-    with edit_prompt_form:
-        prompt_name = st.selectbox("Select Prompt to Edit", [p[0] for p in registry.get_all_personalities()], key="edit_prompt_select")
-        system_prompt = registry.get_personality_description(prompt_name)
-        if system_prompt:
-            edit_prompt_description = st.text_area("Current Prompt Description", value=system_prompt, height=700)
-        update_prompt_button = st.form_submit_button("Update Prompt")
+    
+    # Move the selectbox outside the form to allow for dynamic updates
+    personalities = registry.get_all_personalities()
+    if personalities:
+        selected_prompt = st.selectbox("Select Prompt to Edit", [p[0] for p in personalities], key="edit_prompt_select")
         
-        if update_prompt_button:
-            if prompt_name and edit_prompt_description:
-                try:
-                    registry.edit_personality_description(prompt_name, edit_prompt_description)
-                    st.success("System prompt updated successfully!")
-                except Exception as e:
-                    st.error(f"Error updating system prompt: {e}")
+        # Get the description for the selected prompt
+        system_prompt = registry.get_personality_description(selected_prompt)
+        
+        edit_prompt_form = st.form("Edit System Prompt Form", clear_on_submit=False)
+        with edit_prompt_form:
+            if system_prompt:
+                edit_prompt_description = st.text_area("Current Prompt Description", value=system_prompt, height=700, key="edit_prompt_textarea")
             else:
-                st.warning("Please fill in all fields.")
+                edit_prompt_description = st.text_area("Current Prompt Description", height=700, key="edit_prompt_textarea")
+            update_prompt_button = st.form_submit_button("Update Prompt")
+            
+            if update_prompt_button:
+                if selected_prompt and edit_prompt_description:
+                    try:
+                        registry.edit_personality_description(selected_prompt, edit_prompt_description)
+                        st.success("System prompt updated successfully!")
+                        st.rerun()  # Refresh to show updated content
+                    except Exception as e:
+                        st.error(f"Error updating system prompt: {e}")
+                else:
+                    st.warning("Please fill in all fields.")
+    else:
+        st.info("No system prompts available to edit.")
                 
     # Delete existing system prompts
     st.markdown("#### Delete Existing System Prompts")
